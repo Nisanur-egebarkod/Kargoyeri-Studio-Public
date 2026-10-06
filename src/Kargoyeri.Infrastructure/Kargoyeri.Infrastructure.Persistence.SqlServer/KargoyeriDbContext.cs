@@ -1,5 +1,7 @@
+using System.Text.Json;
 using Kargoyeri.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace Kargoyeri.Infrastructure.Persistence.SqlServer;
 
@@ -53,8 +55,8 @@ public sealed class KargoyeriDbContext : DbContext
 			entity.Property(x => x.LabelUrl).HasMaxLength(2048);
 			entity.Property(x => x.ProviderMessage).HasMaxLength(1024);
 			entity.Property(x => x.ErrorMessage).HasMaxLength(2048);
-			entity.Property(x => x.Metadata).HasConversion(_003CKargoyeriDbContext_003EFE8CB336D941F77E2D0277DD0E9818290F28BFC1DEF100CA3C7C86F572D2D8342__JsonConvert.Converter<Dictionary<string, string>>()).HasColumnName("MetadataJson");
-			entity.Property(x => x.Packages).HasConversion(_003CKargoyeriDbContext_003EFE8CB336D941F77E2D0277DD0E9818290F28BFC1DEF100CA3C7C86F572D2D8342__JsonConvert.Converter<List<Kargoyeri.Domain.ValueObjects.PackageInfo>>()).HasColumnName("PackagesJson");
+			entity.Property(x => x.Metadata).HasConversion(JsonColumn.Converter<Dictionary<string, string>>()).HasColumnName("MetadataJson");
+			entity.Property(x => x.Packages).HasConversion(JsonColumn.Converter<List<Kargoyeri.Domain.ValueObjects.PackageInfo>>()).HasColumnName("PackagesJson");
 			entity.OwnsOne(x => x.Sender, owned => ConfigureAddress(owned, "Sender"));
 			entity.OwnsOne(x => x.Recipient, owned => ConfigureAddress(owned, "Recipient"));
 		});
@@ -66,9 +68,9 @@ public sealed class KargoyeriDbContext : DbContext
 			entity.Property(x => x.TenantKey).HasMaxLength(64);
 			entity.Property(x => x.Name).HasMaxLength(256).IsRequired();
 			entity.Property(x => x.ApiKeyHash).HasMaxLength(512).IsRequired();
-			entity.Property(x => x.AllowedProviders).HasConversion(_003CKargoyeriDbContext_003EFE8CB336D941F77E2D0277DD0E9818290F28BFC1DEF100CA3C7C86F572D2D8342__JsonConvert.Converter<List<Kargoyeri.Domain.Enums.CargoProviderType>>()).HasColumnName("AllowedProvidersJson");
-			entity.Property(x => x.NotificationTargets).HasConversion(_003CKargoyeriDbContext_003EFE8CB336D941F77E2D0277DD0E9818290F28BFC1DEF100CA3C7C86F572D2D8342__JsonConvert.Converter<List<Kargoyeri.Domain.ValueObjects.NotificationTarget>>()).HasColumnName("NotificationTargetsJson");
-			entity.Property(x => x.Metadata).HasConversion(_003CKargoyeriDbContext_003EFE8CB336D941F77E2D0277DD0E9818290F28BFC1DEF100CA3C7C86F572D2D8342__JsonConvert.Converter<Dictionary<string, string>>()).HasColumnName("MetadataJson");
+			entity.Property(x => x.AllowedProviders).HasConversion(JsonColumn.Converter<List<Kargoyeri.Domain.Enums.CargoProviderType>>()).HasColumnName("AllowedProvidersJson");
+			entity.Property(x => x.NotificationTargets).HasConversion(JsonColumn.Converter<List<Kargoyeri.Domain.ValueObjects.NotificationTarget>>()).HasColumnName("NotificationTargetsJson");
+			entity.Property(x => x.Metadata).HasConversion(JsonColumn.Converter<Dictionary<string, string>>()).HasColumnName("MetadataJson");
 		});
 
 		modelBuilder.Entity<NotificationMessage>(entity =>
@@ -113,8 +115,23 @@ public sealed class KargoyeriDbContext : DbContext
 			entity.Property(x => x.Password).HasMaxLength(512);
 			entity.Property(x => x.ApiKey).HasMaxLength(1024);
 			entity.Property(x => x.EndpointBase).HasMaxLength(512);
-			entity.Property(x => x.AdditionalSettings).HasConversion(_003CKargoyeriDbContext_003EFE8CB336D941F77E2D0277DD0E9818290F28BFC1DEF100CA3C7C86F572D2D8342__JsonConvert.Converter<Dictionary<string, string>>()).HasColumnName("AdditionalSettingsJson");
+			entity.Property(x => x.AdditionalSettings).HasConversion(JsonColumn.Converter<Dictionary<string, string>>()).HasColumnName("AdditionalSettingsJson");
 		});
+	}
+
+	private static class JsonColumn
+	{
+		private static readonly JsonSerializerOptions Options = new();
+
+		public static ValueConverter<T, string> Converter<T>() where T : class, new()
+			=> new(
+				value => JsonSerializer.Serialize(value, Options),
+				value => Deserialize<T>(value));
+
+		private static T Deserialize<T>(string? value) where T : class, new()
+			=> string.IsNullOrWhiteSpace(value)
+				? new T()
+				: JsonSerializer.Deserialize<T>(value, Options) ?? new T();
 	}
 
 	private static void ConfigureAddress(Microsoft.EntityFrameworkCore.Metadata.Builders.OwnedNavigationBuilder<CargoShipment, Kargoyeri.Domain.ValueObjects.AddressInfo> owned, string prefix)

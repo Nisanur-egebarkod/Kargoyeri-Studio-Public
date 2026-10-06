@@ -61,18 +61,6 @@ public sealed class AccessController : Controller
         }
 
         var displayName = string.IsNullOrWhiteSpace(match.DisplayName) ? match.Email : match.DisplayName;
-        if (_environment.IsProduction() && !IsAdminTotpConfigured(match))
-        {
-            admin.ErrorMessage = "Production yonetici girisi icin TOTP zorunlu. StudioAccess:Admins altinda TotpSecret ve TotpEnabled alanlarini doldurun.";
-            return View(admin);
-        }
-
-        if (RequiresAdminTotp(match))
-        {
-            TempData[PendingAdminTotpKey] = $"{match.Email}|{displayName}";
-            return RedirectToAction(nameof(LoginAdminTotp));
-        }
-
         await SignInAdminAsync(match, displayName);
         return RedirectToAction("Index", "Home");
     }
@@ -123,7 +111,7 @@ public sealed class AccessController : Controller
         {
             if (_environment.IsProduction())
             {
-                model.ErrorMessage = "Production ortaminda admin access code devre disidir. E-posta/parola ve TOTP kullanin.";
+                model.ErrorMessage = "Production ortaminda admin access code devre disidir. E-posta ve parola kullanin.";
                 return View(model);
             }
 
